@@ -1,3 +1,7 @@
+asyncio
 typer
 tabulate
 pandas
+msldap
+datetime
+impacket

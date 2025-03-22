@@ -29,7 +29,7 @@ def main(
 ):
 
 
-    logs_dir = init_logger(verbose)
+    init_logger(verbose)
     scomhunter = SCOMHUNTER(username=username, password=password, hashes=hashes, aes=aes, kerberos=kerberos,
                             no_pass=no_pass, domain=domain, dc_ip=dc_ip, ldaps=ldaps, fqdn=fqdn, verbose=verbose)
     asyncio.run(scomhunter.run())

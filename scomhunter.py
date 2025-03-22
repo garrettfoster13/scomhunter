@@ -21,11 +21,11 @@ app.add_typer(
     help=find.HELP
 )
 
-# app.add_typer(
-#     http.app,
-#     name=http.COMMAND_NAME,
-#     help=http.HELP
-# )
+app.add_typer(
+    http.app,
+    name=http.COMMAND_NAME,
+    help=http.HELP
+)
 
 # app.add_typer(
 #     mssql.app,

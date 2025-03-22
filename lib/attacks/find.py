@@ -26,7 +26,6 @@ class SCOMHUNTER:
         self.verbose = verbose
         self.ldap_session = None
    
-   #done
     async def ldapsession(self):
         """Build the msldap URL and return the connection"""
         auth_options = {
@@ -43,7 +42,6 @@ class SCOMHUNTER:
     
         ldap_client = await ldap_session(auth_options)         # Generate the LDAP URL
         return ldap_client     
-    
     
     async def find_mgmtserver(self):
         """Find SCOM Management Servers. All will have the MSOMHSvc ServicePrincipalName"""
@@ -69,9 +67,8 @@ class SCOMHUNTER:
             logger.info(f"Something went wrong {e}")
             
     async def find_sdkuser(self):
-        """Find SCOM Data Access Service Accounts if they're in use
-        """
-        ldap_filter = "(&(serviceprincipalname=blah/*)(samaccounttype=805306368)(!(samaccounttype=805306370)))"
+        """Find SCOM Data Access Service Accounts if they're in use"""
+        ldap_filter = "(&(serviceprincipalname=MSOMSdkSvc/*)(samaccounttype=805306368)(!(samaccounttype=805306370)))"
         attributes = '*' 
         logger.info("[*] Searching for SCOM SDK Service Accounts")
         try:
@@ -98,8 +95,8 @@ class SCOMHUNTER:
             
     async def run(self):
         HELPERS.create_db()
-        if not self.ldap_session:                               #bind to ldap
-            self.ldap_session = await self.ldapsession()        #set search base to query
+        if not self.ldap_session:                               
+            self.ldap_session = await self.ldapsession()        
         
         mgmt_servers = await self.find_mgmtserver()
         if mgmt_servers:
