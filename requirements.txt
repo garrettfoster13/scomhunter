@@ -1,0 +1,3 @@
+typer
+tabulate
+pandas
