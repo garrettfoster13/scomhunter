@@ -33,11 +33,11 @@ app.add_typer(
 #     help=mssql.HELP
 # )
 
-# app.add_typer(
-#     dpapi.app,
-#     name=dpapi.COMMAND_NAME,
-#     help=dpapi.HELP
-# )
+app.add_typer(
+    dpapi.app,
+    name=dpapi.COMMAND_NAME,
+    help=dpapi.HELP
+)
 
 if __name__ == '__main__':
     small_banner()

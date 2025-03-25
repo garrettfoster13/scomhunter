@@ -1,5 +1,5 @@
 import asyncio
-from lib.ldap import ldap_session
+from lib.sessions import ldap_session
 from lib.logger import logger
 from lib.scripts.helpers import HELPERS
 
@@ -19,12 +19,14 @@ class SCOMHUNTER:
         #target vars
         self.domain = domain
         self.dc_ip = dc_ip
-        self.ldaps = ldaps
+        self.protocol = "ldaps" if ldaps else "ldap"
         self.fqdn = fqdn
 
         #other
         self.verbose = verbose
         self.ldap_session = None
+                
+
    
     async def ldapsession(self):
         """Build the msldap URL and return the connection"""
@@ -35,7 +37,7 @@ class SCOMHUNTER:
             "nt": self.hashes,
             "dcip": self.dc_ip,
             "fqdn": self.fqdn,  
-            "ldaps": self.ldaps,
+            "protocol": self.protocol,
             "kerberos": self.kerberos,
             "nopass": self.no_pass
         }
@@ -89,7 +91,7 @@ class SCOMHUNTER:
                     HELPERS.insert_to_db(table_name="Users", data=users)
                 return True
             else:
-                logger.info("[-] Could not find any Managment Servers in LDAP. SCOM doesn't appear to be in use.")
+                logger.info("[-] Could not find any SDK user accounts in LDAP.")
         except Exception as e:
             logger.info(f"Something went wrong {e}")
             

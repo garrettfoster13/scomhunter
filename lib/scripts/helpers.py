@@ -41,6 +41,7 @@ class HELPERS:
         cursor.execute('CREATE TABLE IF NOT EXISTS ManagementServers (Hostname, SPN, Vulnerable, UNIQUE(Hostname))')
         cursor.execute('CREATE TABLE IF NOT EXISTS Users (Username, Description, SPN, pwdLastSet, UNIQUE(Username))')
         cursor.execute('CREATE TABLE IF NOT EXISTS Groups (Name, Description, Member,UNIQUE(Name))')
+        cursor.execute('CREATE TABLE IF NOT EXISTS Credentials (Username, Password, SourceHost)')
         conn.commit()
         conn.close()
         
