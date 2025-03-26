@@ -1,5 +1,5 @@
 import asyncio
-from lib.sessions import ldap_session
+from lib.sessions import ldap_session, ImpacketSMB
 from lib.logger import logger
 from lib.scripts.helpers import HELPERS
 
@@ -35,6 +35,7 @@ class SCOMHUNTER:
             "username": self.username,
             "password": self.password,
             "nt": self.hashes,
+            "aes": self.aes,
             "dcip": self.dc_ip,
             "fqdn": self.fqdn,  
             "protocol": self.protocol,
@@ -43,7 +44,7 @@ class SCOMHUNTER:
         }
     
         ldap_client = await ldap_session(auth_options)         # Generate the LDAP URL
-        return ldap_client     
+        return auth_options, ldap_client     
     
     async def find_mgmtserver(self):
         """Find SCOM Management Servers. All will have the MSOMHSvc ServicePrincipalName"""
@@ -98,7 +99,7 @@ class SCOMHUNTER:
     async def run(self):
         HELPERS.create_db()
         if not self.ldap_session:                               
-            self.ldap_session = await self.ldapsession()        
+            auth_options, self.ldap_session = await self.ldapsession()        
         
         mgmt_servers = await self.find_mgmtserver()
         if mgmt_servers:
@@ -107,6 +108,6 @@ class SCOMHUNTER:
         sdk_users = await self.find_sdkuser()
         if sdk_users:
             HELPERS.show_table("Users")
-        
+
 
 
