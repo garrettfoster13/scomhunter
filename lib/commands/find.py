@@ -22,7 +22,7 @@ def main(
     domain          : str   = typer.Option(..., '-d',  help="Domain "),
     dc_ip           : str   = typer.Option(..., '-dc-ip',  help = "IP address of domain controller"),
     ldaps           : bool  = typer.Option(False, '-ldaps', help='Use LDAPS instead of LDAP'),
-    fqdn            : bool  = typer.Option(False, '-fqdn', help="FQDN of domain controller"),
+    fqdn            : str   = typer.Option(None, '-fqdn', help="FQDN of domain controller"),
 
     #other
     verbose         : bool  = typer.Option(False, '-v',help='Enable Verbose Logging'),
