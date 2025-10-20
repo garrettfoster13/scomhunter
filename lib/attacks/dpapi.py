@@ -47,7 +47,7 @@ class DPAPIHUNTER():
 
 
     async def enum_values(self, regpaths:list):
-        """Get RunAs crednetial DPAPI blobs"""
+        """Get RunAs credential DPAPI blobs"""
         runas_blobs = []
         for runaspath in regpaths:
             hkey, err = await self.reg.OpenRegPath(runaspath)
