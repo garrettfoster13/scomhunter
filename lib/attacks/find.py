@@ -49,7 +49,7 @@ class SCOMHUNTER:
     async def find_mgmtserver(self):
         """Find SCOM Management Servers. All will have the MSOMHSvc ServicePrincipalName"""
         ldap_filter = "(serviceprincipalname=MSOMHSvc/*)"
-        attributes = '*' #paged_search in msldap doesn't have a dnshostname attribute, need to PR
+        attributes = '[*]' #paged_search in msldap doesn't have a dnshostname attribute, need to PR
         logger.info("[*] Searching for SCOM Management Servers")
         try:
             _entry = self.ldap_session.pagedsearch(ldap_filter, attributes)
@@ -72,7 +72,7 @@ class SCOMHUNTER:
     async def find_sdkuser(self):
         """Find SCOM Data Access Service Accounts if they're in use"""
         ldap_filter = "(&(serviceprincipalname=MSOMSdkSvc/*)(samaccounttype=805306368)(!(samaccounttype=805306370)))"
-        attributes = '*' 
+        attributes = '[*]' 
         logger.info("[*] Searching for SCOM SDK Service Accounts")
         try:
             _entry = self.ldap_session.pagedsearch(ldap_filter, attributes)
