@@ -5,3 +5,4 @@ pandas
 msldap
 datetime
 impacket
+aiosmb
