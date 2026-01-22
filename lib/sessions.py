@@ -7,12 +7,30 @@ from getpass import getpass
 import asyncio
 from io import BytesIO
 import ntpath
+from urllib.parse import quote
 
 #impacket stuff for DPAPI
 from impacket.smbconnection import SMBConnection, SessionError
 
 
 def proto_url(auth_options):
+    # Create a copy of auth_options with URL-encoded credentials
+    encoded_options = auth_options.copy()
+
+    # URL-encode fields that may contain special characters
+    if "username" in encoded_options and encoded_options["username"]:
+        encoded_options["username"] = quote(encoded_options["username"], safe='')
+    if "password" in encoded_options and encoded_options["password"]:
+        encoded_options["password"] = quote(encoded_options["password"], safe='')
+    if "domain" in encoded_options and encoded_options["domain"]:
+        encoded_options["domain"] = quote(encoded_options["domain"], safe='')
+    if "nt" in encoded_options and encoded_options["nt"]:
+        encoded_options["nt"] = quote(encoded_options["nt"], safe='')
+    if "aeskey" in encoded_options and encoded_options["aeskey"]:
+        encoded_options["aeskey"] = quote(encoded_options["aeskey"], safe='')
+    if "pfx" in encoded_options and encoded_options["pfx"]:
+        encoded_options["pfx"] = quote(encoded_options["pfx"], safe='')
+
     url_format = {
         "ntlm": f"{{protocol}}+ntlm-password://{{domain}}\\{{username}}:{{password}}@{{dcip}}",
         "nt": f"{{protocol}}+ntlm-nt://{{domain}}\\{{username}}:{{nt}}@{{dcip}}",
@@ -20,9 +38,9 @@ def proto_url(auth_options):
         "kerb_rc4": f"{{protocol}}+kerberos-rc4://{{domain}}\\{{username}}:{{nt}}@{{fqdn}}/?dc={{dcip}}",
         "kerb_aes": f"{{protocol}}+kerberos-aes://{{domain}}\\{{username}}:{{aeskey}}@{{fqdn}}/?dc={{dcip}}",
         "kerb_ccache": f"{{protocol}}+kerberos+ccache://{{domain}}\\{{username}}:creds.ccache@127.0.0.1",
-        "kerb_pfx": f"{{protocol}}+kerberos+pfx://{{domain}}\\{{username}}:{{password}}@{{dcip}}/?certdata={{pfx}}"          
+        "kerb_pfx": f"{{protocol}}+kerberos+pfx://{{domain}}\\{{username}}:{{password}}@{{dcip}}/?certdata={{pfx}}"
     }
- 
+
     if "nt" in auth_options and auth_options["nt"]:
         if auth_options["kerberos"]:
             url_type = "kerb_rc4"
@@ -40,9 +58,9 @@ def proto_url(auth_options):
             url_type = "kerb_password"
         else:
             url_type = "ntlm"
-    
+
     format_string = url_format[url_type]
-    return format_string.format(**auth_options)
+    return format_string.format(**encoded_options)
 
 
 async def ldap_session(auth_options):
