@@ -13,7 +13,7 @@ I strongly encourage using the [uv](https://docs.astral.sh/uv/getting-started/in
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/garrettfoster13/scomhunter
-cd comhunter
+cd scomhunter
 uv sync
 uv run scomhunter.py
 ```
