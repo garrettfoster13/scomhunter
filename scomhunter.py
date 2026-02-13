@@ -27,11 +27,11 @@ app.add_typer(
     help=http.HELP
 )
 
-# app.add_typer(
-#     mssql.app,
-#     name=mssql.COMMAND_NAME,
-#     help=mssql.HELP
-# )
+app.add_typer(
+    mssql.app,
+    name=mssql.COMMAND_NAME,
+    help=mssql.HELP
+)
 
 app.add_typer(
     dpapi.app,
