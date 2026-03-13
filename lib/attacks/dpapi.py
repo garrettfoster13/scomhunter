@@ -23,7 +23,7 @@ logging.getLogger('aiosmb').setLevel(logging.ERROR)
 class DPAPIHUNTER():
     
     def __init__(self, username:str = None, password: str = None, hashes: str = None, aes: str = None, 
-                 kerberos: str = False, no_pass: bool = False, domain: str = None, targetp: str = None, 
+                 kerberos: str = False, no_pass: bool = False, domain: str = None, target: str = None, 
                  fqdn: str = None, verbose: str = False):
         #auth vars
         self.username = username
