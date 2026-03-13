@@ -20,7 +20,7 @@ def main(
     
     #target args
     domain          : str   = typer.Option(..., '-d',  help="Domain "),
-    dc_ip           : str   = typer.Option(..., '--target', '-t',  help = "IP address of target host"),
+    target          : str   = typer.Option(..., '--target', '-t',  help = "IP address of target host"),
     fqdn            : str  = typer.Option(False, '-fqdn', help="FQDN of target host"),
 
     #other
@@ -30,7 +30,7 @@ def main(
 
     init_logger(verbose)
     dpapihunter = DPAPIHUNTER(username=username, password=password, hashes=hashes, aes=aes, kerberos=kerberos,
-                            no_pass=no_pass, domain=domain, dc_ip=dc_ip, fqdn=fqdn, verbose=verbose)
+                            no_pass=no_pass, domain=domain, target=target, fqdn=fqdn, verbose=verbose)
     asyncio.run(dpapihunter.run())
     
     
