@@ -130,7 +130,7 @@ class DPAPI:
 
             if not decrypted:
                 logger.debug(f"[-] Failed to decrypt blob for masterkey: {mkid}")
-            continue
+                continue
     
             decoded_string = decrypted.decode('utf-16le').split('\x00')
             domain, username, password = decoded_string[:3]
