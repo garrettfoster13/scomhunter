@@ -122,10 +122,15 @@ class DPAPI:
                 logger.info("[!] Could not decrypt masterkey " + mkid)
                 continue  # skip this blob, try next
     
-            decrypted = blob.decrypt(key, entropy)
+            try:
+                decrypted = blob.decrypt(key, entropy)
+            except ValueError as e:
+                logger.debug(f"[-] Failed to decrypt blob for masterkey {mkid}: {e}")
+                continue
+
             if not decrypted:
                 logger.debug(f"[-] Failed to decrypt blob for masterkey: {mkid}")
-                continue  # skip, try next
+                continue
     
             decoded_string = decrypted.decode('utf-16le').split('\x00')
             domain, username, password = decoded_string[:3]
