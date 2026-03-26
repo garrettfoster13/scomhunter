@@ -217,8 +217,17 @@ class MSSQLSCOMRELAY:
         logger.info("Waiting for incoming connections...")
         logger.info(f"Query ready: {self.query}")
 
-        self.server.start()
+        try:
+            logger.info("[DEBUG] About to call self.server.start()...")
+            self.server.start()
+            logger.info("[DEBUG] self.server.start() completed")
+        except Exception as e:
+            logger.info(f"[ERROR] Exception starting server: {e}")
+            import traceback
+            logger.info(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+            return
 
+        logger.info("[DEBUG] Entering main loop...")
         try:
             while True:
                 time.sleep(0.1)
@@ -226,7 +235,9 @@ class MSSQLSCOMRELAY:
             logger.info("Keyboard interrupt, exiting...")
             self.shutdown()
         except Exception as e:
-            logger.debug(e)
+            logger.info(f"[ERROR] Exception in main loop: {e}")
+            import traceback
+            logger.info(f"[ERROR] Traceback:\n{traceback.format_exc()}")
 
     def get_attack_mssql_client(self, *args, **kwargs):
         """Return the attack client for MSSQL"""
