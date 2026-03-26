@@ -120,6 +120,8 @@ class MSSQLSCOMRELAY:
         config.setSMB2Support(True)
         config.setMode("RELAY")
         config.setOutputFile(None)
+        config.setDisableMulti(False)
+        config.setKeepRelaying(True)
 
         self.server = SMBRelayServer(config)
         if self.verbose:
