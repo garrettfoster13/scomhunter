@@ -148,12 +148,9 @@ class MSSQLSCOMRELAY:
         config.setTargets(target_processor)
         
         # Set the query for MSSQL - this is how ntlmrelayx does it with -q flag
-        config.queries = {}
-        config.queries[self.target] = self.query
+        # config.queries must be a LIST of queries, not a dict!
+        config.queries = [self.query]
         logger.info(f"[DEBUG] Set query in config.queries: {config.queries}")
-        
-        # Also try setting it as an attack
-        config.setAttacks({"MSSQL": self.get_attack_mssql_client})
         
         config.setListeningPort(port)
         config.setInterfaceIp(interface)
