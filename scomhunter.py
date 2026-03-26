@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import typer
-from lib.commands import find, mssql, http, dpapi
+from lib.commands import find, mssql, http, dpapi, relay
 from lib.scripts.banner import small_banner
 
 
@@ -37,6 +37,12 @@ app.add_typer(
     dpapi.app,
     name=dpapi.COMMAND_NAME,
     help=dpapi.HELP
+)
+
+app.add_typer(
+    relay.app,
+    name=relay.COMMAND_NAME,
+    help=relay.HELP
 )
 
 if __name__ == '__main__':
