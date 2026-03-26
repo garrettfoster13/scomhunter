@@ -115,7 +115,6 @@ class MSSQLSCOMRELAY:
         config.setSMB2Support(True)
         config.setMode("RELAY")
         config.setOutputFile(None)
-        config.setQuery(self.query)  # Set the query in the config
 
         self.server = SMBRelayServer(config)
 
