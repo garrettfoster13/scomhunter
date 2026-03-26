@@ -8,8 +8,9 @@ HELP = 'SCOM MSSQL NTLM Relay Attack - Manipulate SCOM admin role membership'
 
 @app.callback(no_args_is_help=True, invoke_without_command=True)
 def main(
-    # Required args
-    target          : str   = typer.Option(..., "-t", "--target", help="Target MSSQL server (e.g., 192.168.1.10:1433 or mssql.domain.com)"),
+    # Target args (mutually exclusive)
+    target          : str   = typer.Option(None, "-t", "--target", help="Single target MSSQL server (e.g., 192.168.1.10:1433 or mssql.domain.com)"),
+    target_file     : str   = typer.Option(None, "-tf", "--target-file", help="File containing list of MSSQL servers (one per line)"),
     
     # Optional args
     sid             : str   = typer.Option(None, "-s", "--sid", help="SID of user to add/remove (required for update/delete operations)"),
@@ -48,6 +49,15 @@ def main(
     
     init_logger(verbose)
     
+    # Validate target arguments
+    if not target and not target_file:
+        typer.echo("Error: Either -t/--target or -tf/--target-file must be specified")
+        raise typer.Exit(1)
+    
+    if target and target_file:
+        typer.echo("Error: Cannot specify both -t/--target and -tf/--target-file")
+        raise typer.Exit(1)
+    
     # Determine operation mode
     operation_mode = 'update'  # default
     mode_count = sum([update, delete, list_members])
@@ -70,6 +80,7 @@ def main(
     # Create and start the relay
     scom_relay = MSSQLSCOMRELAY(
         target=target,
+        target_file=target_file,
         sid=sid,
         interface=interface,
         port=port,

