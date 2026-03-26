@@ -154,8 +154,9 @@ class MSSQLSCOMRELAY:
         logger.info(f"[DEBUG] Set query in config.queries: {config.queries}")
         
         # Register Impacket's built-in MSSQL attack class
-        config.setAttacks({"MSSQL": MSSQLAttack})
-        logger.info("[DEBUG] Registered MSSQLAttack class")
+        # We need to pass it as a lambda/function, not the class directly
+        config.setAttacks({"MSSQL": lambda *args, **kwargs: MSSQLAttack(*args, **kwargs)})
+        logger.info("[DEBUG] Registered MSSQLAttack class as factory function")
         
         config.setListeningPort(port)
         config.setInterfaceIp(interface)
