@@ -1,10 +1,12 @@
 import time
+import logging
 from threading import Lock
 
 from impacket.examples.ntlmrelayx.servers import SMBRelayServer
 from impacket.examples.ntlmrelayx.utils.config import NTLMRelayxConfig
 from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor
 from impacket.ldap import ldaptypes
+from impacket import LOG as impacket_logger
 
 # Import the pre-populated protocol clients and attacks dictionaries
 from impacket.examples.ntlmrelayx.clients import PROTOCOL_CLIENTS
@@ -116,9 +118,19 @@ class MSSQLSCOMRELAY:
             logger.info("Error: Failed to build SQL query. Exiting.")
             return
 
+        # Configure Impacket's logger to show relay messages
+        impacket_logger.setLevel(logging.INFO)
+        
         logger.info(f"Listening on {self.interface}:{self.port}")
         logger.info("Waiting for incoming connections...")
-        logger.info(f"Query ready: {self.query}")
+        
+        # Print helpful message based on operation mode
+        if self.operation_mode == 'list':
+            logger.info("[*] Relay will list SCOM admin role members when authentication is received")
+        elif self.operation_mode == 'delete':
+            logger.info("[*] Relay will remove SID from SCOM admin role when authentication is received")
+        else:
+            logger.info("[*] Relay will add SID to SCOM admin role when authentication is received")
 
         try:
             if self.verbose:
@@ -134,14 +146,6 @@ class MSSQLSCOMRELAY:
 
         if self.verbose:
             logger.info("[DEBUG] Entering main loop...")
-        
-        # Print helpful message based on operation mode
-        if self.operation_mode == 'list':
-            logger.info("[*] Relay will list SCOM admin role members when authentication is received")
-        elif self.operation_mode == 'delete':
-            logger.info("[*] Relay will remove SID from SCOM admin role when authentication is received")
-        else:
-            logger.info("[*] Relay will add SID to SCOM admin role when authentication is received")
         try:
             while True:
                 time.sleep(0.1)
