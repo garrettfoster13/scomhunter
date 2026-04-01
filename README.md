@@ -38,8 +38,9 @@ Usage: scomhunter [OPTIONS] COMMAND [ARGS]...
 ╭─ Commands ────────────────────────────────────────────────────────────────────────────────╮
 │ find    Enumerate LDAP for SCOM assets.                                                   │
 │ http    SCOM Web Console NTLM Relay Attack                                                │
-│ mssql   Convert provided sid to hex format and return MSSQL query                         │
+│ mssql   Convert provided sid to hex format and return MSSQL query                         |
 │ dpapi   Extract DPAPI Protected RunAs Credentials                                         │
+| relay   SCOM MSSQL NTLM Relay Attack - Manipulate SCOM admin role membership              │
 ╰───────────────────────────────────────────────────────────────────────────────────────────╯
 
 ```
