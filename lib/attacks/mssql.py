@@ -3,12 +3,24 @@ from impacket.ldap import ldaptypes
 
 class MSSQL:
     
-    def __init__(self, sid, delete, verbose):
+    def __init__(self, sid, reverse, delete, verbose):
         self.sid = sid
+        self.reverse = reverse
         self.delete = delete
         self.verbose = verbose
 
-#for right now, this is just the sid conversion, in the future this whould be its own relay module
+    def decode_binary_sid(self, hex_string):
+        try:
+            binary_data = bytes.fromhex(hex_string)
+            sid_obj = ldaptypes.LDAP_SID()
+            sid_obj.fromString(binary_data)
+            canonical_sid = sid_obj.formatCanonical()
+            print(f'[*] Decoded SID: {canonical_sid}')
+            return canonical_sid
+        except Exception as e:
+            print(f'[-] Error decoding SID: {str(e)}')
+            return None
+
     def convert_string_sid(self):
         hexsid = ldaptypes.LDAP_SID()
         hexsid.fromCanonical(self.sid)
@@ -33,7 +45,9 @@ class MSSQL:
 
 
     def run(self):
-        if not self.delete:
+        if self.reverse:
+            self.decode_binary_sid(self.reverse)
+        elif not self.delete:
             querysid = self.convert_string_sid()
             if self.convert_string_sid:
                 self.build_insert_mssql_query(querysid)
