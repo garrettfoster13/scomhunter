@@ -82,6 +82,8 @@ class SCOMHUNTER:
                     username = spn = desc = pwdlastset = None       
                     if "userPrincipalName" in result['attributes']:
                         username = result['attributes']['userPrincipalName']
+                    if not username and "sAMAccountName" in result['attributes']:
+                        username = result['attributes']['sAMAccountName']
                     if "servicePrincipalName" in result['attributes']:
                         spn = result['attributes']['servicePrincipalName']
                     if "description" in result['attributes']:
