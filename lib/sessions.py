@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 from lib.logger import logger
 from msldap.commons.factory import LDAPConnectionFactory
 from msldap.commons.exceptions import LDAPBindException
@@ -16,6 +17,21 @@ from impacket.smbconnection import SMBConnection, SessionError
 def proto_url(auth_options):
     # Create a copy of auth_options with URL-encoded credentials
     encoded_options = auth_options.copy()
+
+    # When using ccache auth, populate the ccache path from KRB5CCNAME and
+    # resolve the DC FQDN (needed to build a valid Kerberos SPN: ldap/<fqdn>).
+    if encoded_options.get("nopass") and encoded_options.get("kerberos"):
+        ccache_path = os.environ.get("KRB5CCNAME", "")
+        encoded_options["ccache"] = quote(ccache_path, safe='')
+        if not encoded_options.get("fqdn"):
+            import socket
+            dc_ip = encoded_options.get("dcip", "")
+            try:
+                resolved = socket.getfqdn(dc_ip)
+                # getfqdn returns the IP unchanged when PTR resolution fails
+                encoded_options["fqdn"] = resolved if resolved != dc_ip else dc_ip
+            except Exception:
+                encoded_options["fqdn"] = dc_ip
 
     # URL-encode fields that may contain special characters
     if "username" in encoded_options and encoded_options["username"]:
@@ -37,7 +53,7 @@ def proto_url(auth_options):
         "kerb_password": f"{{protocol}}+kerberos-password://{{domain}}\\{{username}}:{{password}}@{{fqdn}}/?dc={{dcip}}",
         "kerb_rc4": f"{{protocol}}+kerberos-rc4://{{domain}}\\{{username}}:{{nt}}@{{fqdn}}/?dc={{dcip}}",
         "kerb_aes": f"{{protocol}}+kerberos-aes://{{domain}}\\{{username}}:{{aeskey}}@{{fqdn}}/?dc={{dcip}}",
-        "kerb_ccache": f"{{protocol}}+kerberos+ccache://{{domain}}\\{{username}}:creds.ccache@127.0.0.1",
+        "kerb_ccache": f"{{protocol}}+kerberos-ccache://{{domain}}\\{{username}}:{{ccache}}@{{fqdn}}/?dc={{dcip}}",
         "kerb_pfx": f"{{protocol}}+kerberos+pfx://{{domain}}\\{{username}}:{{password}}@{{dcip}}/?certdata={{pfx}}"
     }
 
