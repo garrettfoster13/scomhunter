@@ -18,20 +18,26 @@ def proto_url(auth_options):
     # Create a copy of auth_options with URL-encoded credentials
     encoded_options = auth_options.copy()
 
-    # When using ccache auth, populate the ccache path from KRB5CCNAME and
-    # resolve the DC FQDN (needed to build a valid Kerberos SPN: ldap/<fqdn>).
+    # When using ccache auth, populate the ccache path from KRB5CCNAME.
+    # The @<host> part of the URL becomes the Kerberos SPN (ldap/<host>@REALM).
+    # An IP address causes KDC_ERR_S_PRINCIPAL_UNKNOWN — a hostname is required.
+    # If -fqdn was not passed, attempt a DNS SRV lookup to discover a DC hostname.
     if encoded_options.get("nopass") and encoded_options.get("kerberos"):
         ccache_path = os.environ.get("KRB5CCNAME", "")
         encoded_options["ccache"] = quote(ccache_path, safe='')
         if not encoded_options.get("fqdn"):
-            import socket
-            dc_ip = encoded_options.get("dcip", "")
+            import dns.resolver
+            domain = auth_options.get("domain", "")
             try:
-                resolved = socket.getfqdn(dc_ip)
-                # getfqdn returns the IP unchanged when PTR resolution fails
-                encoded_options["fqdn"] = resolved if resolved != dc_ip else dc_ip
+                answers = dns.resolver.resolve(f"_ldap._tcp.{domain}", "SRV")
+                best = sorted(answers, key=lambda r: (r.priority, -r.weight))[0]
+                encoded_options["fqdn"] = str(best.target).rstrip(".")
             except Exception:
-                encoded_options["fqdn"] = dc_ip
+                raise Exception(
+                    "Kerberos ccache auth requires a DC hostname to build a valid Kerberos SPN. "
+                    f"DNS SRV lookup for _ldap._tcp.{domain} failed. "
+                    "Pass -fqdn <dc_hostname> explicitly (e.g. -fqdn dc01.domain.com)."
+                )
 
     # URL-encode fields that may contain special characters
     if "username" in encoded_options and encoded_options["username"]:
